@@ -10,11 +10,24 @@ logger = logging.getLogger(__name__)
 
 
 class ArticleGenerator:
-    """Generate valuable articles for note based on sales data (using Ollama - free local LLM)"""
+    """Generate articles with Ollama, then refine with Claude for professional editing"""
 
     def __init__(self):
         self.ollama_url = os.getenv("OLLAMA_API_URL", "http://localhost:11434")
-        self.model = "mistral"  # Fast, high-quality text generation
+        self.generation_model = "mistral"  # Fast, free article generation
+
+        # Optional: Claude API for professional refinement
+        self.anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+        self.claude_model = "claude-3-5-sonnet-20241022"
+        if self.anthropic_key:
+            try:
+                from anthropic import Anthropic
+                self.claude_client = Anthropic(api_key=self.anthropic_key)
+            except Exception as e:
+                logger.warning(f"Claude client unavailable: {e}. Using Ollama-only mode.")
+                self.claude_client = None
+        else:
+            self.claude_client = None
 
     async def generate_daily_articles(self, num_articles: int = 3) -> list[dict]:
         """Generate multiple articles for daily posting"""
@@ -211,6 +224,10 @@ class ArticleGenerator:
             # 1文1行・文末「。」の自動化
             content = self._normalize_article_format(content)
 
+            # Claude で添削（API キーがある場合）
+            if self.claude_client:
+                content = await self._refine_with_claude(content, idea)
+
             article = {
                 "title": idea,
                 "content": content,
@@ -243,6 +260,45 @@ class ArticleGenerator:
             return "analysis"
         else:
             return "strategy"
+
+    async def _refine_with_claude(self, content: str, title: str) -> str:
+        """Refine article with Claude for professional quality"""
+        if not self.claude_client:
+            return content
+
+        try:
+            refinement_prompt = f"""以下の記事をプロの作家目線で添削してください。
+
+【記事タイトル】
+{title}
+
+【記事本文】
+{content}
+
+【添削のポイント】
+1. **説得力の強化**：読者の心に響く文章になっているか。感情と論理のバランスは取れているか。
+2. **文体の統一**：「です・ます」「である」「だ」が混在していないか。一貫性を確保。
+3. **具体性**：抽象的な表現を具体的に。「これ」「それ」を明確な名詞に。
+4. **リズム感**：句点の位置は適切か。読みやすく、呼吸がしやすい文章か。
+5. **不要な表現の削除**：冗長さ、重複がないか。「てにをは」は正確か。
+6. **FIRE読者向けの最適化**：¥1,800の価値を感じさせる内容か。実装可能性は明確か。
+
+元の構成と意図は保ちながら、より洗練された文章に改善してください。
+本文のみを出力してください（説明や注釈は不要）。"""
+
+            message = self.claude_client.messages.create(
+                model=self.claude_model,
+                max_tokens=2000,
+                messages=[{"role": "user", "content": refinement_prompt}]
+            )
+
+            refined = message.content[0].text
+            logger.info(f"Article refined with Claude: {title}")
+            return refined
+
+        except Exception as e:
+            logger.warning(f"Claude refinement failed, using original: {e}")
+            return content
 
     def _normalize_article_format(self, content: str) -> str:
         """Normalize article to 1-sentence-per-line format with 。 at end"""

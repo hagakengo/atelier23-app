@@ -920,6 +920,35 @@ def refine_article(article_id: int, request: RefinementRequest):
             "error": str(e)
         }
 
+@app.post("/api/articles/{article_id}/update-refined")
+def update_refined_article(article_id: int, request: RefinementRequest):
+    """Update article with Claude Code's refined version"""
+    db = SessionLocal()
+    article = db.query(ArticleLog).filter(ArticleLog.id == article_id).first()
+
+    if not article:
+        db.close()
+        return {"error": "Article not found"}, 404
+
+    try:
+        article.title = request.title
+        article.content = request.content
+        article.updated_at = datetime.now()
+        db.commit()
+
+        logger.info(f"✅ Article {article_id} refined and updated in database")
+
+        return {
+            "success": True,
+            "message": "Article refined and updated successfully",
+            "article_id": article_id
+        }
+    except Exception as e:
+        logger.error(f"Error updating refined article: {str(e)}")
+        return {"success": False, "error": str(e)}
+    finally:
+        db.close()
+
 @app.delete("/api/articles/{article_id}")
 def delete_article(article_id: int):
     """Delete article draft"""

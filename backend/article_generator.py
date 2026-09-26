@@ -149,30 +149,49 @@ class ArticleGenerator:
         return base_ideas[:num_articles]
 
     async def _generate_article(self, idea: str, analysis: dict, db: Session) -> dict:
-        """Generate a single article using Claude"""
+        """Generate a single article using Claude - FIRE-optimized template"""
         try:
-            prompt = f"""以下のテーマで、note 読者向けの有価な記事を執筆してください。
+            prompt = f"""【note有料記事を執筆】読者の人生を変える説得力のある記事を作成してください。
 
 テーマ: {idea}
 
-読者の状況：
-- トレーディングカード投資に興味がある
-- eBay での販売を考えている
-- 月 10-20 万円の副業収入を目指している
+【ターゲット読者の心理状態】
+- 月5-50万円を目指しているが「本当に稼げるのか」と疑っている
+- 失敗経験があり、もう失敗したくない心情を抱えている
+- 「確実な方法」「実証済みのテクニック」に飢えている
+- 記事を読んだら「今すぐ実行したい」と思わせる必要がある
 
-記事の要件：
-1. 読者の悩みを最初に提示する（なぜこの記事が必要か）
-2. 具体的なデータ・実例を交える
-3. 実行可能なテクニック・ステップを3-5個提示
-4. note の有料購読を促すような価値を提供
-5. マークダウン形式で、見出し・箇条書きを活用
+【記事構成】（必須 - 読者の心を動かす流れ）
+1. **共感と問題提示（4-5行）**：「あなたはこんな経験ありませんか？」と読者の痛みを指摘。失敗の苦しさを言語化する
+2. **希望の提示（3行）**：「実は、この問題は解決できる」と希望を見せる
+3. **根拠データ（5-6行）**：実際のビジネス数字で「この記事の信頼性」を立証。感情ではなく論理で確信させる
+4. **コア解決法（8-10行）**：3-5つのステップを具体的に。それぞれを「なぜこれが効果的か」まで説明する
+5. **実装ハードル克服（4-5行）**：「よくある失敗」「陥りやすい罠」を指摘。読者が実装時に「あ、この落とし穴だ」と気づかせる
+6. **アクションチェックリスト（6-8行）**：今週・今月・3ヶ月後の行動を明確化。読者が迷わずに実行できるようにする
+7. **感情的クロージング（3-4行）**：「この方法を使えば、3ヶ月後のあなたは○○になっている」と未来を見せる
 
-以下は実際のビジネスデータです：
-- 今週の平均売却価格: ¥{analysis.get('avg_price', 0):,.0f}
-- 今週の平均利益: ¥{analysis.get('avg_profit', 0):,.0f}
-- 販売件数: {analysis.get('total_sales', 0)} 件
+【実際のビジネスデータ - 信頼性の根拠】
+- 実績：平均売却価格 ¥{analysis.get('avg_price', 0):,.0f}、平均利益 ¥{analysis.get('avg_profit', 0):,.0f}
+- 検証済み販売件数: {analysis.get('total_sales', 0)} 件
+- 信頼性：これらは机上の空論ではなく「実際に出ている数字」である
 
-記事本文をマークダウン形式で生成してください。"""
+【文体ルール】（厳守 - 読者の心に届く文章のために）
+- 1文は必ず1行（読みやすさ）
+- 文末は「。」で統一（一貫性）
+- 読点「、」は控えめに（1文に最大1個）
+- 「です・ます」は使わず「である」「だ」で統一（信頼感）
+- 数字は常に「¥」をつける（説得力）
+- 「あなた」「私たち」を使って読者との距離を縮める
+- 段落は3-4行でまとめる（リズム感）
+
+【必ず提供する価値】
+1. **感情的価値**：読者が「この著者は自分の痛みを理解している」と感じる
+2. **認知的価値**：読者が「なるほど、だからこの方法が効果的なのか」と納得する
+3. **実装的価値**：読者が「明日からこれを実行しよう」と思える具体性
+4. **経済的価値**：読者が「この記事は¥1,800の価値がある」と確信する
+
+本文のみ（タイトルなし、マークダウン形式）を出力してください。
+記事の最後に「この記事が役に立ったら、コメントやサポートをお願いします」は追加しないでください。本文だけに集中してください。"""
 
             message = self.client.messages.create(
                 model=self.model,
@@ -186,6 +205,9 @@ class ArticleGenerator:
             )
 
             content = message.content[0].text
+
+            # 1文1行・文末「。」の自動化
+            content = self._normalize_article_format(content)
 
             article = {
                 "title": idea,
@@ -216,6 +238,40 @@ class ArticleGenerator:
             return "analysis"
         else:
             return "strategy"
+
+    def _normalize_article_format(self, content: str) -> str:
+        """Normalize article to 1-sentence-per-line format with 。 at end"""
+        import re
+
+        lines = []
+        current_line = ""
+
+        # Replace various sentence endings with 。
+        content = re.sub(r'([^。\n])$', r'\1。', content, flags=re.MULTILINE)
+        content = re.sub(r'([^。])(\n)', r'\1。\2', content)
+
+        for char in content:
+            if char == '。':
+                current_line += char
+                lines.append(current_line.strip())
+                current_line = ""
+            elif char == '\n':
+                if current_line.strip():
+                    if not current_line.endswith('。'):
+                        current_line += '。'
+                    lines.append(current_line.strip())
+                    current_line = ""
+            else:
+                current_line += char
+
+        if current_line.strip():
+            if not current_line.strip().endswith('。'):
+                current_line += '。'
+            lines.append(current_line.strip())
+
+        # Remove empty lines and rejoin
+        lines = [line for line in lines if line]
+        return '\n'.join(lines)
 
     def save_article(self, article: dict, db: Session = None) -> bool:
         """Save generated article to database"""

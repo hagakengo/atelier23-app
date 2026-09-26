@@ -214,7 +214,7 @@ class ArticleGenerator:
                     "stream": False,
                     "temperature": 0.7,
                 },
-                timeout=120
+                timeout=300  # mistral は生成に時間がかかる
             )
             response.raise_for_status()
 

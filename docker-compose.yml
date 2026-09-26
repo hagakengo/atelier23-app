@@ -10,12 +10,8 @@ services:
     volumes:
       - ./backend:/app
     command: python main.py
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
-      - 1.1.1.1
-    cap_add:
-      - NET_ADMIN
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - atelier-net
 

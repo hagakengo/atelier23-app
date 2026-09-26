@@ -635,21 +635,52 @@ def get_card_price_details(card_id: str):
 
 @app.post("/api/generate-articles")
 async def generate_articles(num_articles: int = 3):
-    """Generate articles manually"""
+    """Generate articles manually and save to database"""
+    db = SessionLocal()
     try:
         from article_generator import ArticleGenerator
         generator = ArticleGenerator()
         articles = await generator.generate_daily_articles(num_articles)
+
+        # Save articles to database
+        saved_articles = []
+        for article in articles:
+            article_log = ArticleLog(
+                title=article.get("title"),
+                content=article.get("content"),
+                category=article.get("category", "strategy"),
+                related_sales_ids=article.get("related_sales_ids"),
+                status="draft"
+            )
+            db.add(article_log)
+            db.commit()
+            db.refresh(article_log)
+            saved_articles.append(article_log)
+
+        logger.info(f"Generated and saved {len(saved_articles)} articles")
+
         return {
             "success": True,
-            "count": len(articles),
-            "articles": articles
+            "count": len(saved_articles),
+            "articles": [
+                {
+                    "id": a.id,
+                    "title": a.title,
+                    "content": a.content,
+                    "category": a.category,
+                    "status": a.status
+                }
+                for a in saved_articles
+            ]
         }
     except Exception as e:
+        logger.error(f"Error generating articles: {str(e)}")
         return {
             "success": False,
             "error": str(e)
         }
+    finally:
+        db.close()
 
 @app.post("/api/publish-articles")
 async def publish_articles():

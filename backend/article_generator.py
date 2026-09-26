@@ -209,7 +209,7 @@ class ArticleGenerator:
             response = requests.post(
                 f"{self.ollama_url}/api/generate",
                 json={
-                    "model": self.model,
+                    "model": self.generation_model,
                     "prompt": prompt,
                     "stream": False,
                     "temperature": 0.7,

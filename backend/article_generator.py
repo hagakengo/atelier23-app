@@ -2,20 +2,19 @@ import logging
 import json
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from anthropic import Anthropic
+import requests
+import os
 from main import SaleRecord, Card, ArticleLog, SessionLocal
 
 logger = logging.getLogger(__name__)
 
 
 class ArticleGenerator:
-    """Generate valuable articles for note based on sales data"""
+    """Generate valuable articles for note based on sales data (using Ollama - free local LLM)"""
 
-    def __init__(self, api_key: str = None):
-        import os
-        self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
-        self.client = Anthropic(api_key=self.api_key)
-        self.model = "claude-3-5-sonnet-20241022"
+    def __init__(self):
+        self.ollama_url = os.getenv("OLLAMA_API_URL", "http://localhost:11434")
+        self.model = "mistral"  # Fast, high-quality text generation
 
     async def generate_daily_articles(self, num_articles: int = 3) -> list[dict]:
         """Generate multiple articles for daily posting"""
@@ -149,7 +148,7 @@ class ArticleGenerator:
         return base_ideas[:num_articles]
 
     async def _generate_article(self, idea: str, analysis: dict, db: Session) -> dict:
-        """Generate a single article using Claude - FIRE-optimized template"""
+        """Generate a single article using Ollama (free local LLM) - FIRE-optimized template"""
         try:
             prompt = f"""【note有料記事を執筆】読者の人生を変える説得力のある記事を作成してください。
 
@@ -190,21 +189,24 @@ class ArticleGenerator:
 3. **実装的価値**：読者が「明日からこれを実行しよう」と思える具体性
 4. **経済的価値**：読者が「この記事は¥1,800の価値がある」と確信する
 
-本文のみ（タイトルなし、マークダウン形式）を出力してください。
+本文のみ（タイトルなし）を出力してください。
 記事の最後に「この記事が役に立ったら、コメントやサポートをお願いします」は追加しないでください。本文だけに集中してください。"""
 
-            message = self.client.messages.create(
-                model=self.model,
-                max_tokens=2000,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ]
+            # Ollama 経由で記事生成
+            response = requests.post(
+                f"{self.ollama_url}/api/generate",
+                json={
+                    "model": self.model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "temperature": 0.7,
+                },
+                timeout=120
             )
+            response.raise_for_status()
 
-            content = message.content[0].text
+            data = response.json()
+            content = data.get("response", "").strip()
 
             # 1文1行・文末「。」の自動化
             content = self._normalize_article_format(content)
@@ -223,6 +225,9 @@ class ArticleGenerator:
             logger.info(f"Generated article with affiliate links: {idea}")
             return article
 
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Ollama API error: {str(e)}")
+            return None
         except Exception as e:
             logger.error(f"Error generating article: {str(e)}")
             return None

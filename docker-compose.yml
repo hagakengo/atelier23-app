@@ -1,0 +1,41 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: atelier23-backend
+    ports:
+      - "9000:8000"
+    env_file: ./backend/.env
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    volumes:
+      - ./backend:/app
+    command: python main.py
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 1.1.1.1
+    cap_add:
+      - NET_ADMIN
+    networks:
+      - atelier-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: atelier23-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      - VITE_API_URL=http://localhost:9000
+    command: npm run dev
+    networks:
+      - atelier-net
+
+networks:
+  atelier-net:
+    driver: bridge

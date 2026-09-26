@@ -26,6 +26,9 @@ services:
       - backend
     environment:
       - VITE_API_URL=http://localhost:9000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     command: npm run dev
     networks:
       - atelier-net

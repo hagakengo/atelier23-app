@@ -141,6 +141,7 @@ body {
   z-index: 100;
   backdrop-filter: blur(10px);
   background: rgba(255, 255, 255, 0.95);
+  flex-wrap: wrap;
 }
 
 .nav-btn {

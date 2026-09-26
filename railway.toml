@@ -1,2 +1,7 @@
+[build]
+builder = "dockerfile"
+dockerfile = "Dockerfile"
+buildContext = "."
+
 [deploy]
 startCommand = "python main.py"

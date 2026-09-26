@@ -23,6 +23,7 @@ export function ArticleDashboard({ apiBase }: ArticleDashboardProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState<'all' | 'draft' | 'ready' | 'published'>('all');
+  const [refining, setRefining] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     content: '',
@@ -132,6 +133,33 @@ export function ArticleDashboard({ apiBase }: ArticleDashboardProps) {
     }
   };
 
+  const handleRefineArticle = async () => {
+    if (!selectedArticle) return;
+
+    setRefining(true);
+    try {
+      const res = await fetch(`${apiBase}/api/articles/${selectedArticle.id}/refine`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: formData.title,
+          content: formData.content
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        alert('✅ 添削を送信しました。Claude Code が専門的に改善します。\n\n改善済みの記事が反映されるまで、少々お待ちください。');
+        setRefining(false);
+      } else {
+        setError('添削リクエストに失敗しました');
+      }
+    } catch (err) {
+      setError('エラーが発生しました');
+      setRefining(false);
+    }
+  };
+
   const handlePostToNoteQuick = async () => {
     if (!selectedArticle) return;
 
@@ -213,6 +241,13 @@ export function ArticleDashboard({ apiBase }: ArticleDashboardProps) {
                 ) : (
                   <div className="editor-buttons">
                     <button className="btn-edit" onClick={() => setEditMode(true)}>✏️ 編集</button>
+                    <button
+                      className="btn-refine"
+                      onClick={handleRefineArticle}
+                      disabled={refining}
+                    >
+                      {refining ? '⏳ 添削中...' : '🔧 添削'}
+                    </button>
                     <button
                       className="btn-copy"
                       onClick={handleCopyNoteFormat}

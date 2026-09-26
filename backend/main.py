@@ -852,6 +852,39 @@ def get_article_note_format(article_id: int):
         "category": article.category
     }
 
+@app.post("/api/articles/{article_id}/refine")
+def refine_article(article_id: int, title: str, content: str):
+    """Submit article for Claude Code professional refinement"""
+    db = SessionLocal()
+    article = db.query(ArticleLog).filter(ArticleLog.id == article_id).first()
+
+    if not article:
+        db.close()
+        return {"error": "Article not found"}, 404
+
+    try:
+        # Log the refinement request for Claude Code to monitor
+        logger.info(f"🔧 REFINEMENT REQUEST: Article ID {article_id}")
+        logger.info(f"  Title: {title}")
+        logger.info(f"  Content preview: {content[:200]}...")
+        logger.info(f"  Full content:\n{content}")
+        logger.info(f"🔧 END REFINEMENT REQUEST")
+
+        db.close()
+        return {
+            "success": True,
+            "message": "Article submitted for refinement. Claude Code will review and improve it shortly.",
+            "article_id": article_id
+        }
+
+    except Exception as e:
+        logger.error(f"Error submitting refinement: {str(e)}")
+        db.close()
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
 @app.delete("/api/articles/{article_id}")
 def delete_article(article_id: int):
     """Delete article draft"""

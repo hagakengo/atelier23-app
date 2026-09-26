@@ -883,8 +883,12 @@ def get_article_note_format(article_id: int):
         "category": article.category
     }
 
+class RefinementRequest(BaseModel):
+    title: str
+    content: str
+
 @app.post("/api/articles/{article_id}/refine")
-def refine_article(article_id: int, title: str, content: str):
+def refine_article(article_id: int, request: RefinementRequest):
     """Submit article for Claude Code professional refinement"""
     db = SessionLocal()
     article = db.query(ArticleLog).filter(ArticleLog.id == article_id).first()
@@ -896,9 +900,9 @@ def refine_article(article_id: int, title: str, content: str):
     try:
         # Log the refinement request for Claude Code to monitor
         logger.info(f"🔧 REFINEMENT REQUEST: Article ID {article_id}")
-        logger.info(f"  Title: {title}")
-        logger.info(f"  Content preview: {content[:200]}...")
-        logger.info(f"  Full content:\n{content}")
+        logger.info(f"  Title: {request.title}")
+        logger.info(f"  Content preview: {request.content[:200]}...")
+        logger.info(f"  Full content:\n{request.content}")
         logger.info(f"🔧 END REFINEMENT REQUEST")
 
         db.close()
